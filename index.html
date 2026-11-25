@@ -1,0 +1,2050 @@
+<meta charset="utf-8">
+<title>NetSuite RESTlet Connection Guide</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: sticky step rail on the left, one long reference column on the right; collapses to a single column on phones. */
+:root {
+  /* Folio3 palette: brand red #f32735 (hover #d81f2c), slate #313c41, greys */
+  --stripe: linear-gradient(to right, #f32735 0 16.66%, #f34141 16.66% 33.33%, #ee7d7d 33.33% 50%,
+                            #999999 50% 66.66%, #cccccc 66.66% 83.33%, #f3f3f3 83.33% 100%);
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --ink: #313c41;
+  --muted: #595959;
+  --line: #d9d9d9;
+  --accent: #f32735;          /* Folio3 red */
+  --accent-hover: #d81f2c;    /* Folio3 red on hover */
+  --accent-ink: #ffffff;
+  --accent-soft: #fdeef0;
+  --warn: #8a5a00;
+  --warn-soft: #fbf1dc;
+  --done: #1d7a3d;
+
+  --code-bg: #f7f7f7;
+  --code-line: #d9d9d9;
+  --code-ink: #313c41;
+  --code-muted: #6b6b6b;
+  --code-key: #b4192a;
+  --code-str: #1f6f3a;
+  --code-fn: #6f3cad;
+  --code-num: #9a4a00;
+  --code-type: #1e5a8a;
+  --code-prop: #1d4f91;
+  --code-punct: #595959;
+
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  --r: 8px;
+  color-scheme: light;   /* white theme only, no dark mode */
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.6;
+}
+a { color: var(--accent); }
+a:hover { color: var(--accent-hover); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+code, kbd { font-family: var(--font-mono); font-size: 0.86em; }
+:not(pre) > code {
+  background: var(--accent-soft);
+  color: var(--ink);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+}
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; line-height: 1.15; margin: 0; }
+
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+/* Header */
+header.top { border-bottom: 1px solid var(--line); background: var(--surface); }
+header.top::before { content: ""; display: block; height: 6px; background: var(--stripe); }
+header.top .wrap { padding-block: 40px 32px; display: grid; gap: 14px; }
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+header.top h1 { font-size: clamp(30px, 5vw, 46px); font-weight: 700; letter-spacing: -0.01em; }
+header.top p { margin: 0; max-width: 68ch; color: var(--muted); font-size: 18px; }
+.flow {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  font-family: var(--font-mono); font-size: 13px; color: var(--muted);
+  margin-top: 6px;
+}
+.flow span.node {
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+  padding: 4px 10px; border-radius: 999px;
+}
+.flow span.arrow { color: var(--accent); }
+
+header.top p.agent-link {
+  font-size: 15px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+}
+header.top p.agent-link a { font-family: var(--font-mono); font-size: 14px; }
+header.top p.agent-link .btn-ghost { padding: 3px 10px; font-size: 13px; }
+
+/* Shell */
+.shell { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 48px; padding-block: 40px 80px; }
+nav.rail { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; display: grid; gap: 14px; }
+.progress { font-size: 14px; color: var(--muted); display: grid; gap: 6px; }
+.bar { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--done); transition: width .25s ease; }
+nav.rail ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; counter-reset: s; }
+nav.rail li a {
+  display: grid; grid-template-columns: 26px 1fr; gap: 8px; align-items: baseline;
+  padding: 7px 10px; border-radius: 6px; text-decoration: none; color: var(--ink); font-size: 15px;
+}
+nav.rail li a:hover { background: var(--accent-soft); }
+nav.rail li a .n { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+nav.rail li a.done .n { color: var(--done); }
+nav.rail li a.done .n::before { content: "✓ "; }
+nav.rail li a.done .n { font-size: 0; }
+nav.rail li a.done .n::before { font-size: 13px; }
+nav.rail .sep { height: 1px; background: var(--line); margin: 8px 0; }
+
+main { display: grid; gap: 56px; min-width: 0; }
+
+/* Step */
+section.step { display: grid; gap: 16px; min-width: 0; scroll-margin-top: 24px; }
+.step-head { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; }
+.step-num {
+  font-family: var(--font-mono); font-weight: 600; font-size: 13px;
+  width: 36px; height: 36px; display: grid; place-items: center;
+  border-radius: 50%; border: 1.5px solid var(--accent); color: var(--accent);
+}
+section.step.is-done .step-num { background: var(--done); border-color: var(--done); color: var(--surface); }
+.step-head h2 { font-size: 26px; font-weight: 600; }
+.mark {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;
+  font-size: 14px; color: var(--muted); white-space: nowrap;
+}
+.mark input { width: 18px; height: 18px; accent-color: var(--done); margin: 0; }
+.step-body { display: grid; gap: 14px; padding-left: 50px; min-width: 0; }
+.step-body > p { margin: 0; max-width: 70ch; }
+.where {
+  font-size: 15px; color: var(--muted);
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+}
+.where b { color: var(--ink); font-weight: 600; }
+.where .crumb { font-family: var(--font-mono); font-size: 13px; color: var(--ink); }
+.where .crumb::after { content: " ›"; color: var(--muted); }
+.where .crumb:last-child::after { content: ""; }
+
+ul.checks { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; max-width: 72ch; }
+ul.checks li { position: relative; padding-left: 26px; }
+ul.checks li::before {
+  content: ""; position: absolute; left: 4px; top: 0.6em; width: 9px; height: 9px;
+  border-radius: 2px; border: 1.5px solid var(--accent);
+}
+
+.callout {
+  border-left: 3px solid var(--warn); background: var(--warn-soft);
+  padding: 10px 14px; border-radius: 0 var(--r) var(--r) 0; font-size: 15.5px; max-width: 74ch;
+}
+.callout b { color: var(--warn); }
+.callout.tip { border-left-color: var(--accent); background: var(--accent-soft); }
+.callout.tip b { color: var(--accent); }
+
+table.perm { border-collapse: collapse; font-size: 15px; width: 100%; min-width: 480px; }
+.table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+table.perm th, table.perm td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.perm tr:last-child td { border-bottom: 0; }
+table.perm th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; background: var(--bg); }
+table.perm td:first-child { font-weight: 600; }
+
+/* Code block */
+.code {
+  background: var(--code-bg); color: var(--code-ink);
+  border-radius: var(--r); overflow: hidden; min-width: 0;
+  border: 1px solid var(--code-line);
+}
+.code-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 6px 8px 6px 14px; border-bottom: 1px solid var(--code-line);
+  font-family: var(--font-mono); font-size: 12px; color: var(--code-muted);
+}
+.code-bar .fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.copy {
+  font: 600 12px var(--font-mono); color: var(--code-ink); background: transparent;
+  border: 1px solid var(--code-line); border-radius: 5px; padding: 4px 10px; cursor: pointer;
+  flex-shrink: 0;
+}
+.copy:hover { border-color: var(--code-muted); }
+.copy.ok { color: var(--code-str); border-color: var(--code-str); }
+.code pre {
+  margin: 0; padding: 14px 16px; overflow-x: auto;
+  font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; tab-size: 2;
+}
+.code pre code { font-size: inherit; background: none; padding: 0; color: inherit; white-space: pre; }
+
+.token.comment, .token.prolog, .token.doctype { color: var(--code-muted); font-style: italic; }
+.token.keyword, .token.important, .token.atrule, .token.rule { color: var(--code-key); }
+.token.string, .token.char, .token.attr-value, .token.template-string, .token.url { color: var(--code-str); }
+.token.function, .token.method { color: var(--code-fn); }
+.token.number, .token.boolean, .token.constant { color: var(--code-num); }
+.token.class-name, .token.builtin, .token.namespace, .token.tag { color: var(--code-type); }
+.token.property, .token.attr-name, .token.variable, .token.parameter { color: var(--code-prop); }
+.token.punctuation, .token.operator { color: var(--code-punct); }
+
+/* Values helper */
+.helper {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+  padding: 16px; display: grid; gap: 14px; min-width: 0;
+}
+.fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.field { display: grid; gap: 4px; min-width: 0; }
+.field label { font-size: 13px; font-weight: 600; color: var(--muted); }
+.field input {
+  font: 14px var(--font-mono); color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; width: 100%; min-width: 0;
+}
+.field input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+.derived { display: grid; gap: 8px; font-size: 14px; }
+.derived div { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 10px; align-items: baseline; }
+.derived dt, .derived span.k { color: var(--muted); font-size: 13px; }
+.derived code { overflow-wrap: anywhere; }
+
+.field select {
+  font: 14px var(--font-body); color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; width: 100%; min-width: 0;
+}
+.field select:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+.kg-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.btn {
+  font: 600 15px var(--font-body); color: var(--accent-ink); background: var(--accent);
+  border: 1px solid var(--accent); border-radius: 6px; padding: 9px 18px; cursor: pointer;
+}
+.btn:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn:disabled { opacity: 0.6; cursor: progress; }
+.btn-ghost {
+  font: 600 14px var(--font-body); color: var(--accent); background: transparent;
+  border: 1px solid var(--accent); border-radius: 6px; padding: 7px 14px; cursor: pointer;
+}
+.btn-ghost:hover { background: var(--accent-soft); color: var(--accent-hover); border-color: var(--accent-hover); }
+.kg-status { font-size: 14px; color: var(--muted); }
+.kg-out { display: grid; gap: 12px; min-width: 0; }
+.kg-meta { margin: 0; font-family: var(--font-mono); font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+details.how { border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); min-width: 0; }
+details.how summary { cursor: pointer; padding: 10px 14px; font-weight: 600; font-size: 15px; }
+details.how[open] summary { border-bottom: 1px solid var(--line); }
+details.how .code { margin: 12px; }
+
+/* Language tabs */
+.lang-tabs {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  border-bottom: 1px solid var(--line); padding-bottom: 10px;
+}
+.lang-tabs button {
+  font: 600 14px var(--font-body); color: var(--muted); background: transparent;
+  border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; cursor: pointer;
+}
+.lang-tabs button:hover { color: var(--ink); border-color: var(--muted); }
+.lang-tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.lang-note { font-size: 15px; color: var(--muted); margin: 0; max-width: 74ch; }
+.lang-panel { display: grid; gap: 12px; min-width: 0; }
+.sub { font-family: var(--font-display); font-size: 17px; font-weight: 600; margin: 4px 0 0; }
+
+/* Troubleshooting */
+.errs { display: grid; gap: 10px; }
+.err {
+  display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); gap: 16px;
+  padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+  font-size: 15.5px;
+}
+.err code { font-weight: 600; }
+
+footer { border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+footer .wrap { padding-block: 24px 40px; }
+
+@media (max-width: 900px) {
+  .shell { grid-template-columns: minmax(0, 1fr); gap: 32px; padding-block: 24px 64px; }
+  nav.rail { position: static; }
+  nav.rail ol { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+  .step-body { padding-left: 0; }
+  .fields { grid-template-columns: minmax(0, 1fr); }
+  .err { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .derived div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+}
+@media (max-width: 520px) {
+  .step-head { grid-template-columns: auto 1fr; }
+  .mark { grid-column: 1 / -1; }
+  .step-head h2 { font-size: 22px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; scroll-behavior: auto !important; }
+}
+html { scroll-behavior: smooth; }
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="eyebrow">SuiteTalk · OAuth 2.0 client credentials</div>
+    <h1>Connect an external app to a NetSuite RESTlet</h1>
+    <p>Set up machine-to-machine access once in NetSuite, then call your RESTlet from any server with a signed JWT. Each step lists exactly where to click and what to copy, and the last step has working code in nine languages, plus SuiteScript for calls from inside NetSuite.</p>
+    <div class="flow" aria-label="Request flow">
+      <span class="node">Your app signs a JWT</span><span class="arrow">→</span>
+      <span class="node">…suitetalk.api.netsuite.com/token</span><span class="arrow">→</span>
+      <span class="node">access_token (60 min)</span><span class="arrow">→</span>
+      <span class="node">…restlets.api.netsuite.com</span>
+    </div>
+    <p class="agent-link">Giving this to an AI agent? Use the Markdown version: <a href="guide.md" id="md-link">guide.md</a> <button type="button" class="btn-ghost" id="md-copy">Copy link</button></p>
+  </div>
+</header>
+
+<div class="wrap shell">
+  <nav class="rail" aria-label="Steps">
+    <div class="progress">
+      <span id="progress-label">0 of 8 steps done</span>
+      <div class="bar"><i id="progress-bar"></i></div>
+    </div>
+    <ol id="rail-list">
+      <li><a href="#features"><span class="n">01</span><span>Enable features</span></a></li>
+      <li><a href="#role"><span class="n">02</span><span>Create the role</span></a></li>
+      <li><a href="#integration"><span class="n">03</span><span>Integration record</span></a></li>
+      <li><a href="#keys"><span class="n">04</span><span>Generate a key pair</span></a></li>
+      <li><a href="#mapping"><span class="n">05</span><span>Map the certificate</span></a></li>
+      <li><a href="#restlet"><span class="n">06</span><span>Deploy the RESTlet</span></a></li>
+      <li><a href="#env"><span class="n">07</span><span>Fill in the .env file</span></a></li>
+      <li><a href="#call"><span class="n">08</span><span>Call the RESTlet</span></a></li>
+    </ol>
+    <div class="sep"></div>
+    <ol>
+      <li><a href="#troubleshooting"><span class="n">?</span><span>Troubleshooting</span></a></li>
+      <li><a href="#security"><span class="n">!</span><span>Keeping the key safe</span></a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <!-- 1 -->
+    <section class="step" id="features" data-step="features">
+      <div class="step-head">
+        <span class="step-num">01</span>
+        <h2>Enable features</h2>
+        <label class="mark"><input type="checkbox" id="done-features"> Done</label>
+      </div>
+      <div class="step-body">
+        <div class="where"><b>Where:</b>
+          <span class="crumb">Setup</span><span class="crumb">Company</span><span class="crumb">Enable Features</span><span class="crumb">SuiteCloud</span>
+        </div>
+        <ul class="checks">
+          <li><b>Server SuiteScript</b>, so the RESTlet can run.</li>
+          <li><b>REST Web Services</b>, which provides the token endpoint.</li>
+          <li><b>OAuth 2.0</b>, under <i>Manage Authentication</i>.</li>
+        </ul>
+        <p>Save, and accept the SuiteCloud terms if NetSuite asks. You need an Administrator role for this step.</p>
+      </div>
+    </section>
+
+    <!-- 2 -->
+    <section class="step" id="role" data-step="role">
+      <div class="step-head">
+        <span class="step-num">02</span>
+        <h2>Create the integration role</h2>
+        <label class="mark"><input type="checkbox" id="done-role"> Done</label>
+      </div>
+      <div class="step-body">
+        <div class="where"><b>Where:</b>
+          <span class="crumb">Setup</span><span class="crumb">Users/Roles</span><span class="crumb">Manage Roles</span><span class="crumb">New</span>
+        </div>
+        <p>Give the role only what the integration needs. A leaked key can do whatever this role can, so keep it narrow.</p>
+        <div class="table-scroll">
+          <table class="perm">
+            <thead><tr><th>Permission</th><th>Tab</th><th>Level</th><th>Why</th></tr></thead>
+            <tbody>
+              <tr><td>Log in using OAuth 2.0 Access Tokens</td><td>Setup</td><td>Full</td><td>Required to use the token</td></tr>
+              <tr><td>REST Web Services</td><td>Setup</td><td>Full</td><td>Required for the token endpoint</td></tr>
+              <tr><td>Records your RESTlet touches</td><td>Transactions / Lists</td><td>As needed</td><td>e.g. Sales Order: Create, Customers: View</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Then open the employee record for your integration user, go to <b>Access › Roles</b>, and add this role. A dedicated user, rather than a person's own login, keeps the audit trail clear.</p>
+      </div>
+    </section>
+
+    <!-- 3 -->
+    <section class="step" id="integration" data-step="integration">
+      <div class="step-head">
+        <span class="step-num">03</span>
+        <h2>Create the integration record</h2>
+        <label class="mark"><input type="checkbox" id="done-integration"> Done</label>
+      </div>
+      <div class="step-body">
+        <div class="where"><b>Where:</b>
+          <span class="crumb">Setup</span><span class="crumb">Integration</span><span class="crumb">Manage Integrations</span><span class="crumb">New</span>
+        </div>
+        <ul class="checks">
+          <li>Enter a name your admins will recognise, such as <i>Order Sync Service</i>.</li>
+          <li>On the <b>Authentication</b> tab, under OAuth 2.0, check <b>Client Credentials (Machine to Machine) Grant</b>.</li>
+          <li>Under Scope, check <b>RESTlets</b>. Also check <b>REST Web Services</b> if you'll call the record API.</li>
+          <li>Uncheck Token-Based Authentication and Authorization Code Grant if you don't use them.</li>
+        </ul>
+        <div class="callout"><b>Copy the Client ID now.</b> NetSuite shows the client credentials only once, right after you save. If you lose them, you have to reset them on the record.</div>
+      </div>
+    </section>
+
+    <!-- 4 -->
+    <section class="step" id="keys" data-step="keys">
+      <div class="step-head">
+        <span class="step-num">04</span>
+        <h2>Generate a key pair</h2>
+        <label class="mark"><input type="checkbox" id="done-keys"> Done</label>
+      </div>
+      <div class="step-body">
+        <p>You need two files: <code>private.pem</code>, which stays with your app, and <code>public.pem</code>, which you upload to NetSuite. NetSuite accepts RSA keys of 3072 or 4096 bits. Generate them in this page or with OpenSSL.</p>
+
+        <h3 class="sub">Option A: Generate in your browser (testing only)</h3>
+        <div class="callout"><b>Use this only for testing.</b> For sandbox or production integrations, we recommend generating your own certificate with OpenSSL (Option B) on the machine or secret store where the key will live. Keys from this page pass through your browser and downloads folder, which is fine for a quick test but not for a key that guards real data.</div>
+        <p>This uses your browser's built-in Web Crypto and the <code>@peculiar/x509</code> library. The key is created on your device and never sent anywhere.</p>
+        <div class="helper">
+          <div class="fields">
+            <div class="field">
+              <label for="kg-cn">Certificate name (CN)</label>
+              <input id="kg-cn" value="restlet-integration" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="field">
+              <label for="kg-size">Key size</label>
+              <select id="kg-size">
+                <option value="3072" selected>3072-bit RSA</option>
+                <option value="4096">4096-bit RSA</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="kg-days">Valid for</label>
+              <select id="kg-days">
+                <option value="365" selected>1 year</option>
+                <option value="730">2 years (NetSuite's maximum)</option>
+              </select>
+            </div>
+          </div>
+          <div class="kg-actions">
+            <button type="button" class="btn" id="kg-run">Generate key pair</button>
+            <span id="kg-status" class="kg-status" role="status"></span>
+          </div>
+        </div>
+        <div id="kg-out" class="kg-out" hidden>
+          <p class="kg-meta" id="kg-meta"></p>
+          <div class="kg-actions">
+            <button type="button" class="btn-ghost" id="kg-save">Download again</button>
+          </div>
+          <div class="callout"><b>For testing only.</b> Keep <code>private.pem</code> secret and upload only <code>public.pem</code> to NetSuite in step 5. Before going live, replace this pair with a certificate you generate yourself, then revoke this one's mapping. The keys aren't stored anywhere, so reloading this page discards them.</div>
+        </div>
+        <details class="how">
+          <summary>Use the same code in your own app</summary>
+          <div class="code" data-lang="javascript" data-file="generate-keys.js" data-src="snip-keygen"></div>
+        </details>
+
+        <h3 class="sub">Option B: OpenSSL</h3>
+        <p>Run this on any machine with OpenSSL.</p>
+        <div class="code" data-lang="bash" data-file="Terminal" data-src="snip-openssl"></div>
+        <div class="callout tip"><b>The key isn't tied to a machine.</b> Any server holding <code>private.pem</code> can connect, so treat it like a password. NetSuite caps certificate validity at two years. Note the expiry date so you can rotate the key in time.</div>
+        <div class="callout"><b>Calling from SuiteScript in another NetSuite account?</b> Generate an RSA-PSS key with OpenSSL instead, because NetSuite documents SuiteScript PS256 signing with that key type. The browser generator creates a standard RSA key. The <i>SuiteScript (other account)</i> tab in step 8 has the command.</div>
+      </div>
+    </section>
+
+    <!-- 5 -->
+    <section class="step" id="mapping" data-step="mapping">
+      <div class="step-head">
+        <span class="step-num">05</span>
+        <h2>Map the certificate</h2>
+        <label class="mark"><input type="checkbox" id="done-mapping"> Done</label>
+      </div>
+      <div class="step-body">
+        <div class="where"><b>Where:</b>
+          <span class="crumb">Setup</span><span class="crumb">Integration</span><span class="crumb">OAuth 2.0 Client Credentials (M2M) Setup</span><span class="crumb">Create New</span>
+        </div>
+        <ul class="checks">
+          <li><b>Entity:</b> the integration user from step 2.</li>
+          <li><b>Role:</b> the integration role from step 2.</li>
+          <li><b>Application:</b> the integration record from step 3.</li>
+          <li><b>Certificate:</b> upload <code>public.pem</code>. Never upload <code>private.pem</code>.</li>
+        </ul>
+        <p>After you save, copy the <b>Certificate ID</b> from the list. Your app sends it as the JWT <code>kid</code> header.</p>
+      </div>
+    </section>
+
+    <!-- 6 -->
+    <section class="step" id="restlet" data-step="restlet">
+      <div class="step-head">
+        <span class="step-num">06</span>
+        <h2>Deploy the RESTlet</h2>
+        <label class="mark"><input type="checkbox" id="done-restlet"> Done</label>
+      </div>
+      <div class="step-body">
+        <p>Skip this step if your RESTlet already exists. Otherwise, here is a minimal SuiteScript 2.1 RESTlet: upload it to the File Cabinet, then create a script record and a deployment for it.</p>
+        <div class="code" data-lang="javascript" data-file="SuiteScripts/order_sync_rl.js" data-src="snip-restlet"></div>
+        <ul class="checks">
+          <li>Set the deployment <b>Status</b> to <b>Released</b>. <i>Testing</i> only lets the script owner call it.</li>
+          <li>Under <b>Audience</b>, add the integration role, or select All Roles.</li>
+          <li>Note the script ID and deployment ID, for example <code>customscript_order_sync</code> and <code>customdeploy_order_sync</code>. Numeric internal IDs work too.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 7 -->
+    <section class="step" id="env" data-step="env">
+      <div class="step-head">
+        <span class="step-num">07</span>
+        <h2>Fill in the .env file</h2>
+        <label class="mark"><input type="checkbox" id="done-env"> Done</label>
+      </div>
+      <div class="step-body">
+        <p>Type your account and script details below to build the URLs and the <code>.env</code> file. Account IDs go into the hostname in lowercase, with underscores changed to hyphens. Nothing you type leaves this page.</p>
+        <div class="helper">
+          <div class="fields">
+            <div class="field">
+              <label for="in-account">Account ID</label>
+              <input id="in-account" value="1234567_SB1" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="field">
+              <label for="in-script">Script ID</label>
+              <input id="in-script" value="customscript_order_sync" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="field">
+              <label for="in-deploy">Deployment ID</label>
+              <input id="in-deploy" value="customdeploy_order_sync" autocomplete="off" spellcheck="false">
+            </div>
+          </div>
+          <div class="derived">
+            <div><span class="k">Token endpoint</span><code id="out-token"></code></div>
+            <div><span class="k">RESTlet URL</span><code id="out-restlet"></code></div>
+          </div>
+        </div>
+        <div class="code" data-lang="bash" data-file=".env" id="env-block"></div>
+        <div class="callout"><b>Keep .env and private.pem out of Git.</b> Add both to <code>.gitignore</code>. In production, load them from a secret manager instead of files.</div>
+      </div>
+    </section>
+
+    <!-- 8 -->
+    <section class="step" id="call" data-step="call">
+      <div class="step-head">
+        <span class="step-num">08</span>
+        <h2>Call the RESTlet</h2>
+        <label class="mark"><input type="checkbox" id="done-call"> Done</label>
+      </div>
+      <div class="step-body">
+        <p>Every example does the same three things. It signs a PS256 JWT with your private key and exchanges it for an access token, caches that token until a minute before it expires, and POSTs JSON to the RESTlet with it. Pick a language:</p>
+        <div class="lang-tabs" role="tablist" aria-label="Language" id="lang-tabs"></div>
+        <div class="lang-panel" role="tabpanel" id="lang-panel">
+          <p class="lang-note" id="lang-note"></p>
+          <h3 class="sub">Install</h3>
+          <div class="code" id="lang-install"></div>
+          <h3 class="sub">Code</h3>
+          <div class="code" id="lang-code"></div>
+        </div>
+        <div class="callout tip"><b>The token is cached in memory.</b> Each access token lasts about 60 minutes, so the examples reuse it and only request a new one a minute before it expires. A lock stops parallel calls from requesting several tokens at once. If you run several app instances, each keeps its own token, which is fine. To share one, store it in Redis or a similar cache with the same expiry.</div>
+      </div>
+    </section>
+
+    <!-- Troubleshooting -->
+    <section class="step" id="troubleshooting">
+      <div class="step-head">
+        <span class="step-num">?</span>
+        <h2>Troubleshooting</h2>
+      </div>
+      <div class="step-body">
+        <div class="errs">
+          <div class="err"><div><code>invalid_scope</code> on the token call</div><div>The integration record doesn't have <b>RESTlets</b> checked, or the JWT asks for a scope the record lacks.</div></div>
+          <div class="err"><div><code>invalid_grant</code> or <code>invalid_client</code></div><div>The client ID, certificate ID or key doesn't match the mapping, the certificate has expired or been revoked, or the server clock is off by more than a few minutes.</div></div>
+          <div class="err"><div><code>401 INVALID_LOGIN</code> on the RESTlet</div><div>You sent the request to the <code>suitetalk</code> host instead of <code>restlets</code>, or the token has expired.</div></div>
+          <div class="err"><div><code>403</code> / <code>INSUFFICIENT_PERMISSION</code></div><div>The deployment isn't Released, the role isn't in its Audience, or the role lacks a permission the script uses.</div></div>
+          <div class="err"><div><code>SSS_MISSING_REQD_ARGUMENT</code> or "invalid script"</div><div>The <code>script</code> or <code>deploy</code> query parameter is wrong. Copy them from the deployment record.</div></div>
+          <div class="err"><div>The RESTlet receives an empty body</div><div>Set <code>Content-Type: application/json</code> on the RESTlet request.</div></div>
+          <div class="err"><div>DNS error, host not found</div><div>Check the account ID in the hostname: lowercase, with <code>_</code> changed to <code>-</code>, as in <code>1234567-sb1</code>.</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Security -->
+    <section class="step" id="security">
+      <div class="step-head">
+        <span class="step-num">!</span>
+        <h2>Keeping the key safe</h2>
+      </div>
+      <div class="step-body">
+        <ul class="checks">
+          <li>Store <code>private.pem</code> in a secret manager, and never in Git or a container image.</li>
+          <li>Use a separate key and certificate mapping for each environment, such as sandbox and production.</li>
+          <li>To rotate without downtime, map a new certificate alongside the old one, switch the app over, then revoke the old mapping.</li>
+          <li>If a key leaks, revoke its mapping straight away. Tokens already issued stop working within about an hour.</li>
+          <li>Never log the token request. It contains the signed assertion.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+</div>
+
+<footer>
+  <div class="wrap">Endpoints: token at <code>https://&lt;account&gt;.suitetalk.api.netsuite.com/services/rest/auth/oauth2/v1/token</code>. RESTlets at <code>https://&lt;account&gt;.restlets.api.netsuite.com/app/site/hosting/restlet.nl</code>. Check NetSuite's Help Center for changes in newer releases.</div>
+</footer>
+
+<!-- ===== Snippets (plain text) ===== -->
+<script type="text/plain" id="snip-openssl">openssl req -new -x509 -newkey rsa:3072 -nodes -days 365 -sha256 \
+  -keyout private.pem -out public.pem -subj "/CN=restlet-integration"</script>
+
+<script type="text/plain" id="snip-keygen">// npm install @peculiar/x509   (or load build/x509.js, which defines a global x509)
+import * as x509 from "@peculiar/x509";
+
+x509.cryptoProvider.set(crypto); // the browser's Web Crypto
+
+export async function generateKeyPair({ commonName = "restlet-integration", bits = 3072, days = 365 } = {}) {
+  const alg = {
+    name: "RSA-PSS",
+    hash: "SHA-256",
+    publicExponent: new Uint8Array([1, 0, 1]),
+    modulusLength: bits,
+    saltLength: 32,
+  };
+  const keys = await crypto.subtle.generateKey(alg, true, ["sign", "verify"]);
+
+  // Random positive serial number
+  const serial = crypto.getRandomValues(new Uint8Array(16));
+  serial[0] &= 0x7f;
+
+  const notBefore = new Date();
+  const cert = await x509.X509CertificateGenerator.createSelfSigned({
+    serialNumber: Array.from(serial, (b) => b.toString(16).padStart(2, "0")).join(""),
+    name: `CN=${commonName}`,
+    notBefore,
+    notAfter: new Date(notBefore.getTime() + days * 24 * 60 * 60 * 1000),
+    signingAlgorithm: alg,
+    keys,
+  });
+
+  const publicPem = cert.toString("pem");
+  const privatePem = x509.PemConverter.encode(
+    await crypto.subtle.exportKey("pkcs8", keys.privateKey),
+    "PRIVATE KEY"
+  );
+  return { publicPem, privatePem };
+}
+
+// Save a file from the browser
+export function download(filename, text) {
+  const url = URL.createObjectURL(new Blob([text], { type: "application/x-pem-file" }));
+  const link = Object.assign(document.createElement("a"), { href: url, download: filename });
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// Usage
+const { publicPem, privatePem } = await generateKeyPair({ bits: 3072, days: 365 });
+download("public.pem", publicPem);
+download("private.pem", privatePem);</script>
+
+<script type="text/plain" id="snip-restlet">/**
+ * @NApiVersion 2.1
+ * @NScriptType Restlet
+ */
+define(["N/record", "N/log"], (record, log) => {
+  const post = (body) => {
+    log.audit("Order sync request", JSON.stringify(body));
+
+    const so = record.create({ type: record.Type.SALES_ORDER, isDynamic: true });
+    so.setValue({ fieldId: "externalid", value: body.externalId });
+    // ...set entity, lines and other fields from body
+    const id = so.save();
+
+    return { success: true, id };
+  };
+
+  const get = (params) => {
+    const so = record.load({ type: record.Type.SALES_ORDER, id: params.id });
+    return { id: params.id, status: so.getText({ fieldId: "status" }) };
+  };
+
+  return { post, get };
+});</script>
+
+<script type="text/plain" id="snip-node">require("dotenv").config();
+const fs = require("fs");
+const jwt = require("jsonwebtoken");
+
+const {
+  NS_ACCOUNT_ID, NS_CLIENT_ID, NS_CERTIFICATE_ID,
+  NS_PRIVATE_KEY_PATH, NS_RESTLET_SCRIPT_ID, NS_RESTLET_DEPLOY_ID,
+} = process.env;
+
+const TOKEN_URL = `https://${NS_ACCOUNT_ID}.suitetalk.api.netsuite.com/services/rest/auth/oauth2/v1/token`;
+const RESTLET_URL = `https://${NS_ACCOUNT_ID}.restlets.api.netsuite.com/app/site/hosting/restlet.nl`;
+
+let cachedToken = null;
+let tokenExpiresAt = 0;
+let pendingToken = null;
+
+// Returns the cached token until a minute before it expires.
+async function getAccessToken() {
+  if (cachedToken && Date.now() < tokenExpiresAt - 60_000) return cachedToken;
+  // Concurrent callers share one in-flight token request
+  pendingToken ??= requestAccessToken().finally(() => { pendingToken = null; });
+  return pendingToken;
+}
+
+async function requestAccessToken() {
+  const now = Math.floor(Date.now() / 1000);
+  const assertion = jwt.sign(
+    { iss: NS_CLIENT_ID, scope: ["restlets"], aud: TOKEN_URL, iat: now, exp: now + 3600 },
+    fs.readFileSync(NS_PRIVATE_KEY_PATH),
+    { algorithm: "PS256", header: { kid: NS_CERTIFICATE_ID, typ: "JWT" } }
+  );
+
+  const res = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "client_credentials",
+      client_assertion_type: "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+      client_assertion: assertion,
+    }),
+  });
+  if (!res.ok) throw new Error(`Token request failed: ${res.status} ${await res.text()}`);
+  const data = await res.json();
+  cachedToken = data.access_token;
+  tokenExpiresAt = Date.now() + Number(data.expires_in) * 1000;
+  return cachedToken;
+}
+
+async function postToRestlet(body) {
+  const token = await getAccessToken();
+  const url = new URL(RESTLET_URL);
+  url.searchParams.set("script", NS_RESTLET_SCRIPT_ID);
+  url.searchParams.set("deploy", NS_RESTLET_DEPLOY_ID);
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`RESTlet call failed: ${res.status} ${await res.text()}`);
+  return res.json();
+}
+
+postToRestlet({ externalId: "ORD-1001", lines: [{ sku: "ABC-1", qty: 2 }] })
+  .then((result) => console.log(result))
+  .catch((err) => console.error(err.message));</script>
+
+<script type="text/plain" id="snip-python">import os
+import threading
+import time
+
+import jwt
+import requests
+from dotenv import load_dotenv
+
+load_dotenv()
+
+ACCOUNT = os.environ["NS_ACCOUNT_ID"]
+CLIENT_ID = os.environ["NS_CLIENT_ID"]
+CERT_ID = os.environ["NS_CERTIFICATE_ID"]
+KEY_PATH = os.environ["NS_PRIVATE_KEY_PATH"]
+SCRIPT_ID = os.environ["NS_RESTLET_SCRIPT_ID"]
+DEPLOY_ID = os.environ["NS_RESTLET_DEPLOY_ID"]
+
+TOKEN_URL = f"https://{ACCOUNT}.suitetalk.api.netsuite.com/services/rest/auth/oauth2/v1/token"
+RESTLET_URL = f"https://{ACCOUNT}.restlets.api.netsuite.com/app/site/hosting/restlet.nl"
+
+
+_token = None
+_token_expires_at = 0.0
+_token_lock = threading.Lock()
+
+
+def get_access_token() -> str:
+    """Return the cached token, requesting a new one a minute before it expires."""
+    global _token, _token_expires_at
+    with _token_lock:
+        if _token is None or time.time() >= _token_expires_at - 60:
+            data = _request_access_token()
+            _token = data["access_token"]
+            _token_expires_at = time.time() + int(data["expires_in"])
+        return _token
+
+
+def _request_access_token() -> dict:
+    now = int(time.time())
+    with open(KEY_PATH, "rb") as f:
+        private_key = f.read()
+
+    assertion = jwt.encode(
+        {"iss": CLIENT_ID, "scope": ["restlets"], "aud": TOKEN_URL, "iat": now, "exp": now + 3600},
+        private_key,
+        algorithm="PS256",
+        headers={"kid": CERT_ID, "typ": "JWT"},
+    )
+
+    res = requests.post(
+        TOKEN_URL,
+        data={
+            "grant_type": "client_credentials",
+            "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+            "client_assertion": assertion,
+        },
+        timeout=30,
+    )
+    if not res.ok:
+        raise RuntimeError(f"Token request failed: {res.status_code} {res.text}")
+    return res.json()
+
+
+def post_to_restlet(body: dict) -> dict:
+    res = requests.post(
+        RESTLET_URL,
+        params={"script": SCRIPT_ID, "deploy": DEPLOY_ID},
+        json=body,
+        headers={"Authorization": f"Bearer {get_access_token()}"},
+        timeout=60,
+    )
+    if not res.ok:
+        raise RuntimeError(f"RESTlet call failed: {res.status_code} {res.text}")
+    return res.json()
+
+
+if __name__ == "__main__":
+    print(post_to_restlet({"externalId": "ORD-1001", "lines": [{"sku": "ABC-1", "qty": 2}]}))</script>
+
+<script type="text/plain" id="snip-java">import com.nimbusds.jose.JOSEObjectType;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.crypto.RSASSASigner;
+import com.nimbusds.jose.util.JSONObjectUtils;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
+
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.KeyFactory;
+import java.security.PrivateKey;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.util.Base64;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+public class NetSuiteRestletClient {
+    static final String ACCOUNT = System.getenv("NS_ACCOUNT_ID");
+    static final String CLIENT_ID = System.getenv("NS_CLIENT_ID");
+    static final String CERT_ID = System.getenv("NS_CERTIFICATE_ID");
+    static final String KEY_PATH = System.getenv("NS_PRIVATE_KEY_PATH");
+    static final String SCRIPT_ID = System.getenv("NS_RESTLET_SCRIPT_ID");
+    static final String DEPLOY_ID = System.getenv("NS_RESTLET_DEPLOY_ID");
+
+    static final String TOKEN_URL = "https://" + ACCOUNT + ".suitetalk.api.netsuite.com/services/rest/auth/oauth2/v1/token";
+    static final String RESTLET_URL = "https://" + ACCOUNT + ".restlets.api.netsuite.com/app/site/hosting/restlet.nl";
+
+    static final HttpClient HTTP = HttpClient.newHttpClient();
+
+    // Expects a PKCS#8 key ("BEGIN PRIVATE KEY"), which OpenSSL 3 produces by default.
+    static PrivateKey loadPrivateKey(String path) throws Exception {
+        String pem = Files.readString(Path.of(path))
+                .replaceAll("-----(BEGIN|END) PRIVATE KEY-----", "")
+                .replaceAll("\\s", "");
+        byte[] der = Base64.getDecoder().decode(pem);
+        return KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(der));
+    }
+
+    static String cachedToken;
+    static long tokenExpiresAt;
+
+    // Returns the cached token until a minute before it expires.
+    static synchronized String getAccessToken() throws Exception {
+        if (cachedToken == null || System.currentTimeMillis() >= tokenExpiresAt - 60_000) {
+            Map<String, Object> data = requestAccessToken();
+            cachedToken = (String) data.get("access_token");
+            // NetSuite may send expires_in as a string or a number
+            long expiresIn = Long.parseLong(String.valueOf(data.get("expires_in")));
+            tokenExpiresAt = System.currentTimeMillis() + expiresIn * 1000;
+        }
+        return cachedToken;
+    }
+
+    static Map<String, Object> requestAccessToken() throws Exception {
+        Date now = new Date();
+        JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                .issuer(CLIENT_ID)
+                .audience(TOKEN_URL)
+                .claim("scope", List.of("restlets"))
+                .issueTime(now)
+                .expirationTime(new Date(now.getTime() + 3_600_000))
+                .build();
+        JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.PS256)
+                .keyID(CERT_ID)
+                .type(JOSEObjectType.JWT)
+                .build();
+        SignedJWT jwt = new SignedJWT(header, claims);
+        jwt.sign(new RSASSASigner(loadPrivateKey(KEY_PATH)));
+
+        String form = "grant_type=client_credentials"
+                + "&client_assertion_type=" + enc("urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
+                + "&client_assertion=" + enc(jwt.serialize());
+
+        HttpResponse<String> res = HTTP.send(
+                HttpRequest.newBuilder(URI.create(TOKEN_URL))
+                        .header("Content-Type", "application/x-www-form-urlencoded")
+                        .POST(HttpRequest.BodyPublishers.ofString(form))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        if (res.statusCode() != 200) {
+            throw new IllegalStateException("Token request failed: " + res.statusCode() + " " + res.body());
+        }
+        return JSONObjectUtils.parse(res.body());
+    }
+
+    static String postToRestlet(String jsonBody) throws Exception {
+        String url = RESTLET_URL + "?script=" + enc(SCRIPT_ID) + "&deploy=" + enc(DEPLOY_ID);
+        HttpResponse<String> res = HTTP.send(
+                HttpRequest.newBuilder(URI.create(url))
+                        .header("Authorization", "Bearer " + getAccessToken())
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        if (res.statusCode() >= 300) {
+            throw new IllegalStateException("RESTlet call failed: " + res.statusCode() + " " + res.body());
+        }
+        return res.body();
+    }
+
+    static String enc(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    public static void main(String[] args) throws Exception {
+        String body = """
+                {"externalId": "ORD-1001", "lines": [{"sku": "ABC-1", "qty": 2}]}
+                """;
+        System.out.println(postToRestlet(body));
+    }
+}</script>
+
+<script type="text/plain" id="snip-csharp">using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+
+string Env(string name) =>
+    Environment.GetEnvironmentVariable(name) ?? throw new InvalidOperationException($"Missing {name}");
+
+var account = Env("NS_ACCOUNT_ID");
+var clientId = Env("NS_CLIENT_ID");
+var certId = Env("NS_CERTIFICATE_ID");
+var keyPath = Env("NS_PRIVATE_KEY_PATH");
+var scriptId = Env("NS_RESTLET_SCRIPT_ID");
+var deployId = Env("NS_RESTLET_DEPLOY_ID");
+
+var tokenUrl = $"https://{account}.suitetalk.api.netsuite.com/services/rest/auth/oauth2/v1/token";
+var restletUrl = $"https://{account}.restlets.api.netsuite.com/app/site/hosting/restlet.nl";
+
+using var http = new HttpClient();
+
+string? cachedToken = null;
+var tokenExpiresAt = DateTimeOffset.MinValue;
+var tokenLock = new SemaphoreSlim(1, 1);
+
+var result = await PostToRestletAsync(new
+{
+    externalId = "ORD-1001",
+    lines = new[] { new { sku = "ABC-1", qty = 2 } },
+});
+Console.WriteLine(result);
+
+// Returns the cached token until a minute before it expires.
+async Task<string> GetAccessTokenAsync()
+{
+    await tokenLock.WaitAsync();
+    try
+    {
+        if (cachedToken is null || DateTimeOffset.UtcNow >= tokenExpiresAt.AddSeconds(-60))
+        {
+            var (token, expiresIn) = await RequestAccessTokenAsync();
+            cachedToken = token;
+            tokenExpiresAt = DateTimeOffset.UtcNow.AddSeconds(expiresIn);
+        }
+        return cachedToken!;
+    }
+    finally
+    {
+        tokenLock.Release();
+    }
+}
+
+async Task<(string Token, int ExpiresIn)> RequestAccessTokenAsync()
+{
+    var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+    var header = new { alg = "PS256", typ = "JWT", kid = certId };
+    var payload = new { iss = clientId, scope = new[] { "restlets" }, aud = tokenUrl, iat = now, exp = now + 3600 };
+    var signingInput = $"{B64Url(JsonSerializer.SerializeToUtf8Bytes(header))}.{B64Url(JsonSerializer.SerializeToUtf8Bytes(payload))}";
+
+    using var rsa = RSA.Create();
+    rsa.ImportFromPem(File.ReadAllText(keyPath));
+    var signature = rsa.SignData(Encoding.ASCII.GetBytes(signingInput), HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+    var assertion = $"{signingInput}.{B64Url(signature)}";
+
+    var res = await http.PostAsync(tokenUrl, new FormUrlEncodedContent(new Dictionary<string, string>
+    {
+        ["grant_type"] = "client_credentials",
+        ["client_assertion_type"] = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+        ["client_assertion"] = assertion,
+    }));
+    var body = await res.Content.ReadAsStringAsync();
+    if (!res.IsSuccessStatusCode) throw new Exception($"Token request failed: {(int)res.StatusCode} {body}");
+    var root = JsonDocument.Parse(body).RootElement;
+    // NetSuite may send expires_in as a string or a number
+    var expires = root.GetProperty("expires_in");
+    var expiresIn = expires.ValueKind == JsonValueKind.String ? int.Parse(expires.GetString()!) : expires.GetInt32();
+    return (root.GetProperty("access_token").GetString()!, expiresIn);
+}
+
+async Task<string> PostToRestletAsync(object payload)
+{
+    var url = $"{restletUrl}?script={Uri.EscapeDataString(scriptId)}&deploy={Uri.EscapeDataString(deployId)}";
+    using var req = new HttpRequestMessage(HttpMethod.Post, url)
+    {
+        Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json"),
+    };
+    req.Headers.Authorization = new("Bearer", await GetAccessTokenAsync());
+
+    var res = await http.SendAsync(req);
+    var body = await res.Content.ReadAsStringAsync();
+    if (!res.IsSuccessStatusCode) throw new Exception($"RESTlet call failed: {(int)res.StatusCode} {body}");
+    return body;
+}
+
+static string B64Url(byte[] bytes) =>
+    Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');</script>
+
+<script type="text/plain" id="snip-php"><?php
+require __DIR__ . '/vendor/autoload.php';
+
+use phpseclib3\Crypt\PublicKeyLoader;
+use phpseclib3\Crypt\RSA;
+
+Dotenv\Dotenv::createImmutable(__DIR__)->load();
+
+$account = $_ENV['NS_ACCOUNT_ID'];
+$tokenUrl = "https://{$account}.suitetalk.api.netsuite.com/services/rest/auth/oauth2/v1/token";
+$restletUrl = "https://{$account}.restlets.api.netsuite.com/app/site/hosting/restlet.nl";
+
+function b64url(string $data): string
+{
+    return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+}
+
+function httpPost(string $url, string $body, array $headers): array
+{
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $body,
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 60,
+    ]);
+    $response = curl_exec($ch);
+    if ($response === false) {
+        throw new RuntimeException(curl_error($ch));
+    }
+    $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    return [$status, $response];
+}
+
+// Returns the cached token until a minute before it expires. PHP-FPM starts each request
+// fresh, so the token is also kept in APCu (when installed) to share it across requests.
+function getAccessToken(string $tokenUrl): string
+{
+    static $token = null;
+    static $expiresAt = 0;
+    if ($token !== null && time() < $expiresAt - 60) {
+        return $token;
+    }
+
+    $useApcu = function_exists('apcu_enabled') && apcu_enabled();
+    if ($useApcu) {
+        $cached = apcu_fetch('netsuite_access_token');
+        if (is_array($cached) && time() < $cached['expiresAt'] - 60) {
+            [$token, $expiresAt] = [$cached['token'], $cached['expiresAt']];
+            return $token;
+        }
+    }
+
+    $data = requestAccessToken($tokenUrl);
+    $token = $data['access_token'];
+    $expiresAt = time() + (int) $data['expires_in'];
+    if ($useApcu) {
+        apcu_store('netsuite_access_token', ['token' => $token, 'expiresAt' => $expiresAt], (int) $data['expires_in']);
+    }
+    return $token;
+}
+
+function requestAccessToken(string $tokenUrl): array
+{
+    $now = time();
+    $header = b64url(json_encode(['alg' => 'PS256', 'typ' => 'JWT', 'kid' => $_ENV['NS_CERTIFICATE_ID']]));
+    $payload = b64url(json_encode([
+        'iss' => $_ENV['NS_CLIENT_ID'],
+        'scope' => ['restlets'],
+        'aud' => $tokenUrl,
+        'iat' => $now,
+        'exp' => $now + 3600,
+    ], JSON_UNESCAPED_SLASHES));
+
+    $key = PublicKeyLoader::load(file_get_contents($_ENV['NS_PRIVATE_KEY_PATH']))
+        ->withPadding(RSA::SIGNATURE_PSS)
+        ->withHash('sha256')
+        ->withMGFHash('sha256')
+        ->withSaltLength(32);
+    $assertion = "{$header}.{$payload}." . b64url($key->sign("{$header}.{$payload}"));
+
+    [$status, $body] = httpPost($tokenUrl, http_build_query([
+        'grant_type' => 'client_credentials',
+        'client_assertion_type' => 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+        'client_assertion' => $assertion,
+    ]), ['Content-Type: application/x-www-form-urlencoded']);
+
+    if ($status !== 200) {
+        throw new RuntimeException("Token request failed: {$status} {$body}");
+    }
+    return json_decode($body, true);
+}
+
+function postToRestlet(string $restletUrl, string $tokenUrl, array $data): array
+{
+    $url = $restletUrl . '?' . http_build_query([
+        'script' => $_ENV['NS_RESTLET_SCRIPT_ID'],
+        'deploy' => $_ENV['NS_RESTLET_DEPLOY_ID'],
+    ]);
+    [$status, $body] = httpPost($url, json_encode($data), [
+        'Authorization: Bearer ' . getAccessToken($tokenUrl),
+        'Content-Type: application/json',
+    ]);
+    if ($status >= 300) {
+        throw new RuntimeException("RESTlet call failed: {$status} {$body}");
+    }
+    return json_decode($body, true);
+}
+
+print_r(postToRestlet($restletUrl, $tokenUrl, [
+    'externalId' => 'ORD-1001',
+    'lines' => [['sku' => 'ABC-1', 'qty' => 2]],
+]));</script>
+
+<script type="text/plain" id="snip-go">package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"net/url"
+	"os"
+	"strconv"
+	"sync"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/joho/godotenv"
+)
+
+func mustEnv(name string) string {
+	v := os.Getenv(name)
+	if v == "" {
+		log.Fatalf("missing environment variable %s", name)
+	}
+	return v
+}
+
+var (
+	tokenMu        sync.Mutex
+	cachedToken    string
+	tokenExpiresAt time.Time
+)
+
+// getAccessToken returns the cached token until a minute before it expires.
+func getAccessToken(tokenURL string) (string, error) {
+	tokenMu.Lock()
+	defer tokenMu.Unlock()
+	if cachedToken != "" && time.Now().Before(tokenExpiresAt.Add(-time.Minute)) {
+		return cachedToken, nil
+	}
+
+	token, expiresIn, err := requestAccessToken(tokenURL)
+	if err != nil {
+		return "", err
+	}
+	cachedToken = token
+	tokenExpiresAt = time.Now().Add(time.Duration(expiresIn) * time.Second)
+	return cachedToken, nil
+}
+
+func requestAccessToken(tokenURL string) (string, int, error) {
+	keyPEM, err := os.ReadFile(mustEnv("NS_PRIVATE_KEY_PATH"))
+	if err != nil {
+		return "", 0, err
+	}
+	key, err := jwt.ParseRSAPrivateKeyFromPEM(keyPEM)
+	if err != nil {
+		return "", 0, err
+	}
+
+	now := time.Now()
+	token := jwt.NewWithClaims(jwt.SigningMethodPS256, jwt.MapClaims{
+		"iss":   mustEnv("NS_CLIENT_ID"),
+		"scope": []string{"restlets"},
+		"aud":   tokenURL,
+		"iat":   now.Unix(),
+		"exp":   now.Add(time.Hour).Unix(),
+	})
+	token.Header["kid"] = mustEnv("NS_CERTIFICATE_ID")
+	assertion, err := token.SignedString(key)
+	if err != nil {
+		return "", 0, err
+	}
+
+	res, err := http.PostForm(tokenURL, url.Values{
+		"grant_type":            {"client_credentials"},
+		"client_assertion_type": {"urn:ietf:params:oauth:client-assertion-type:jwt-bearer"},
+		"client_assertion":      {assertion},
+	})
+	if err != nil {
+		return "", 0, err
+	}
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+	if res.StatusCode != http.StatusOK {
+		return "", 0, fmt.Errorf("token request failed: %d %s", res.StatusCode, body)
+	}
+
+	var tok struct {
+		AccessToken string      `json:"access_token"`
+		ExpiresIn   json.Number `json:"expires_in"` // NetSuite may send a string or a number
+	}
+	if err := json.Unmarshal(body, &tok); err != nil {
+		return "", 0, err
+	}
+	expiresIn, err := strconv.Atoi(tok.ExpiresIn.String())
+	if err != nil {
+		return "", 0, err
+	}
+	return tok.AccessToken, expiresIn, nil
+}
+
+func postToRestlet(restletURL, tokenURL string, payload any) ([]byte, error) {
+	accessToken, err := getAccessToken(tokenURL)
+	if err != nil {
+		return nil, err
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	q := url.Values{"script": {mustEnv("NS_RESTLET_SCRIPT_ID")}, "deploy": {mustEnv("NS_RESTLET_DEPLOY_ID")}}
+	req, err := http.NewRequest(http.MethodPost, restletURL+"?"+q.Encode(), bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+	if res.StatusCode >= 300 {
+		return nil, fmt.Errorf("RESTlet call failed: %d %s", res.StatusCode, body)
+	}
+	return body, nil
+}
+
+func main() {
+	_ = godotenv.Load()
+	account := mustEnv("NS_ACCOUNT_ID")
+	tokenURL := "https://" + account + ".suitetalk.api.netsuite.com/services/rest/auth/oauth2/v1/token"
+	restletURL := "https://" + account + ".restlets.api.netsuite.com/app/site/hosting/restlet.nl"
+
+	body, err := postToRestlet(restletURL, tokenURL, map[string]any{
+		"externalId": "ORD-1001",
+		"lines":      []map[string]any{{"sku": "ABC-1", "qty": 2}},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(string(body))
+}</script>
+
+<script type="text/plain" id="snip-ruby">require "dotenv/load"
+require "json"
+require "jwt"
+require "net/http"
+require "openssl"
+
+ACCOUNT = ENV.fetch("NS_ACCOUNT_ID")
+TOKEN_URL = "https://#{ACCOUNT}.suitetalk.api.netsuite.com/services/rest/auth/oauth2/v1/token"
+RESTLET_URL = "https://#{ACCOUNT}.restlets.api.netsuite.com/app/site/hosting/restlet.nl"
+
+TOKEN_MUTEX = Mutex.new
+@token = nil
+@token_expires_at = 0
+
+# Returns the cached token until a minute before it expires.
+def access_token
+  TOKEN_MUTEX.synchronize do
+    if @token.nil? || Time.now.to_i >= @token_expires_at - 60
+      data = request_access_token
+      @token = data.fetch("access_token")
+      # NetSuite may send expires_in as a string or a number
+      @token_expires_at = Time.now.to_i + Integer(data.fetch("expires_in"))
+    end
+    @token
+  end
+end
+
+def request_access_token
+  key = OpenSSL::PKey::RSA.new(File.read(ENV.fetch("NS_PRIVATE_KEY_PATH")))
+  now = Time.now.to_i
+  assertion = JWT.encode(
+    { iss: ENV.fetch("NS_CLIENT_ID"), scope: ["restlets"], aud: TOKEN_URL, iat: now, exp: now + 3600 },
+    key,
+    "PS256",
+    { kid: ENV.fetch("NS_CERTIFICATE_ID"), typ: "JWT" }
+  )
+
+  res = Net::HTTP.post_form(
+    URI(TOKEN_URL),
+    grant_type: "client_credentials",
+    client_assertion_type: "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+    client_assertion: assertion
+  )
+  raise "Token request failed: #{res.code} #{res.body}" unless res.is_a?(Net::HTTPSuccess)
+
+  JSON.parse(res.body)
+end
+
+def post_to_restlet(body)
+  uri = URI(RESTLET_URL)
+  uri.query = URI.encode_www_form(
+    script: ENV.fetch("NS_RESTLET_SCRIPT_ID"),
+    deploy: ENV.fetch("NS_RESTLET_DEPLOY_ID")
+  )
+
+  res = Net::HTTP.post(
+    uri,
+    body.to_json,
+    "Authorization" => "Bearer #{access_token}",
+    "Content-Type" => "application/json"
+  )
+  raise "RESTlet call failed: #{res.code} #{res.body}" unless res.is_a?(Net::HTTPSuccess)
+
+  JSON.parse(res.body)
+end
+
+puts post_to_restlet(externalId: "ORD-1001", lines: [{ sku: "ABC-1", qty: 2 }])</script>
+
+<script type="text/plain" id="snip-dart">import 'dart:convert';
+import 'dart:io';
+
+import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
+import 'package:dotenv/dotenv.dart';
+import 'package:http/http.dart' as http;
+
+final env = DotEnv(includePlatformEnvironment: true)..load();
+
+String envVar(String name) =>
+    env[name] ?? (throw StateError('Missing environment variable $name'));
+
+final account = envVar('NS_ACCOUNT_ID');
+final tokenUrl = 'https://$account.suitetalk.api.netsuite.com/services/rest/auth/oauth2/v1/token';
+final restletUrl = 'https://$account.restlets.api.netsuite.com/app/site/hosting/restlet.nl';
+
+String? _cachedToken;
+DateTime _tokenExpiresAt = DateTime.fromMillisecondsSinceEpoch(0);
+Future<String>? _pendingToken;
+
+/// Returns the cached token until a minute before it expires.
+Future<String> getAccessToken() {
+  final token = _cachedToken;
+  if (token != null &&
+      DateTime.now().isBefore(_tokenExpiresAt.subtract(const Duration(minutes: 1)))) {
+    return Future.value(token);
+  }
+  // Concurrent callers share one in-flight token request
+  return _pendingToken ??= _requestAccessToken().whenComplete(() => _pendingToken = null);
+}
+
+Future<String> _requestAccessToken() async {
+  final privateKey = RSAPrivateKey(File(envVar('NS_PRIVATE_KEY_PATH')).readAsStringSync());
+  final jwt = JWT(
+    {'iss': envVar('NS_CLIENT_ID'), 'scope': ['restlets'], 'aud': tokenUrl},
+    header: {'kid': envVar('NS_CERTIFICATE_ID'), 'typ': 'JWT'},
+  );
+  // sign() adds iat and exp
+  final assertion = jwt.sign(
+    privateKey,
+    algorithm: JWTAlgorithm.PS256,
+    expiresIn: const Duration(hours: 1),
+  );
+
+  final res = await http.post(Uri.parse(tokenUrl), body: {
+    'grant_type': 'client_credentials',
+    'client_assertion_type': 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+    'client_assertion': assertion,
+  });
+  if (res.statusCode != 200) {
+    throw HttpException('Token request failed: ${res.statusCode} ${res.body}');
+  }
+
+  final data = jsonDecode(res.body) as Map<String, dynamic>;
+  _cachedToken = data['access_token'] as String;
+  // NetSuite may send expires_in as a string or a number
+  final expiresIn = int.parse('${data['expires_in']}');
+  _tokenExpiresAt = DateTime.now().add(Duration(seconds: expiresIn));
+  return _cachedToken!;
+}
+
+Future<dynamic> postToRestlet(Map<String, dynamic> body) async {
+  final uri = Uri.parse(restletUrl).replace(queryParameters: {
+    'script': envVar('NS_RESTLET_SCRIPT_ID'),
+    'deploy': envVar('NS_RESTLET_DEPLOY_ID'),
+  });
+  final res = await http.post(
+    uri,
+    headers: {
+      'Authorization': 'Bearer ${await getAccessToken()}',
+      'Content-Type': 'application/json',
+    },
+    body: jsonEncode(body),
+  );
+  if (res.statusCode >= 300) {
+    throw HttpException('RESTlet call failed: ${res.statusCode} ${res.body}');
+  }
+  return jsonDecode(res.body);
+}
+
+Future<void> main() async {
+  final result = await postToRestlet({
+    'externalId': 'ORD-1001',
+    'lines': [
+      {'sku': 'ABC-1', 'qty': 2},
+    ],
+  });
+  print(result);
+}</script>
+
+<script type="text/plain" id="snip-suitescript">/**
+ * Calls a RESTlet in the same NetSuite account from server-side SuiteScript.
+ * N/https.requestRestlet signs the request as the user and role running this
+ * script, so no OAuth token, key pair or token cache is needed.
+ *
+ * @NApiVersion 2.1
+ * @NScriptType ScheduledScript
+ */
+define(["N/https", "N/log"], (https, log) => {
+  const SCRIPT_ID = "customscript_order_sync";
+  const DEPLOY_ID = "customdeploy_order_sync";
+
+  const postToRestlet = (body) => {
+    const res = https.requestRestlet({
+      scriptId: SCRIPT_ID,
+      deploymentId: DEPLOY_ID,
+      method: https.Method.POST,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (res.code >= 300) {
+      throw new Error(`RESTlet call failed: ${res.code} ${res.body}`);
+    }
+    return JSON.parse(res.body);
+  };
+
+  const execute = () => {
+    const result = postToRestlet({ externalId: "ORD-1001", lines: [{ sku: "ABC-1", qty: 2 }] });
+    log.audit("RESTlet response", JSON.stringify(result));
+  };
+
+  return { execute };
+});</script>
+
+<script type="text/plain" id="snip-suitescript-install"># No packages to install. In NetSuite:
+# 1. Upload the file to the File Cabinet, e.g. SuiteScripts/call_order_sync.js
+# 2. Customization > Scripting > Scripts > New, pick the file, save
+# 3. Create a deployment for it and run it (Save and Execute)
+#
+# The role running this script must be in the RESTlet deployment's Audience.</script>
+
+<script type="text/plain" id="snip-suitescript-remote">/**
+ * Calls a RESTlet in ANOTHER NetSuite account using OAuth 2.0 client credentials.
+ * The JWT is signed with an RSA-PSS certificate stored in this account
+ * (Setup > Company > Certificates), and the access token is cached with N/cache.
+ *
+ * @NApiVersion 2.1
+ * @NScriptType ScheduledScript
+ */
+define(["N/https", "N/encode", "N/crypto/certificate", "N/cache", "N/runtime", "N/log"], (
+  https,
+  encode,
+  certificate,
+  cache,
+  runtime,
+  log
+) => {
+  // Certificate in THIS account that holds the private key
+  const SIGNING_CERT_ID = "custcertificate_ns_target_pss";
+  const TOKEN_CACHE_NAME = "ns_target_oauth";
+
+  const getConfig = () => {
+    const script = runtime.getCurrentScript();
+    const param = (name) => {
+      const value = script.getParameter({ name });
+      if (!value) throw new Error(`Missing script parameter ${name}`);
+      return value;
+    };
+    // Target account ID as used in URLs: lowercase, "_" replaced with "-"
+    const account = param("custscript_target_account");
+    return {
+      clientId: param("custscript_target_client_id"),
+      certId: param("custscript_target_cert_id"), // Certificate ID from the target account's M2M setup
+      scriptId: param("custscript_target_script_id"),
+      deployId: param("custscript_target_deploy_id"),
+      tokenUrl: `https://${account}.suitetalk.api.netsuite.com/services/rest/auth/oauth2/v1/token`,
+      restletUrl: `https://${account}.restlets.api.netsuite.com/app/site/hosting/restlet.nl`,
+    };
+  };
+
+  const base64Url = (text) =>
+    encode
+      .convert({
+        string: text,
+        inputEncoding: encode.Encoding.UTF_8,
+        outputEncoding: encode.Encoding.BASE_64_URL_SAFE,
+      })
+      .replace(/=+$/, "");
+
+  const createAssertion = (config) => {
+    const now = Math.floor(Date.now() / 1000);
+    const header = base64Url(JSON.stringify({ alg: "PS256", typ: "JWT", kid: config.certId }));
+    const payload = base64Url(
+      JSON.stringify({ iss: config.clientId, scope: ["restlets"], aud: config.tokenUrl, iat: now, exp: now + 300 })
+    );
+
+    const signer = certificate.createSigner({
+      certId: SIGNING_CERT_ID,
+      algorithm: certificate.HashAlg.SHA256, // SHA-256 with an RSA-PSS key = PS256
+    });
+    signer.update({ input: `${header}.${payload}` });
+    const signature = signer.sign({ outputEncoding: encode.Encoding.BASE_64_URL_SAFE }).replace(/=+$/, "");
+
+    return `${header}.${payload}.${signature}`;
+  };
+
+  // Returns the cached token until a minute before it expires. Script executions
+  // don't share memory, so the token lives in N/cache. N/cache can evict entries
+  // early; a new token is then requested.
+  const getAccessToken = (config) => {
+    const tokenCache = cache.getCache({ name: TOKEN_CACHE_NAME, scope: cache.Scope.PRIVATE });
+    const cached = tokenCache.get({ key: config.clientId });
+    if (cached) return cached;
+
+    const res = https.request({
+      method: https.Method.POST,
+      url: config.tokenUrl,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: [
+        "grant_type=client_credentials",
+        `client_assertion_type=${encodeURIComponent("urn:ietf:params:oauth:client-assertion-type:jwt-bearer")}`,
+        `client_assertion=${encodeURIComponent(createAssertion(config))}`,
+      ].join("&"),
+    });
+    if (res.code !== 200) {
+      throw new Error(`Token request failed: ${res.code} ${res.body}`);
+    }
+
+    const data = JSON.parse(res.body);
+    // N/cache requires a TTL of at least 300 seconds
+    const ttl = Math.max(300, Number(data.expires_in) - 60);
+    tokenCache.put({ key: config.clientId, value: data.access_token, ttl });
+    return data.access_token;
+  };
+
+  const postToRestlet = (config, body) => {
+    const url =
+      `${config.restletUrl}?script=${encodeURIComponent(config.scriptId)}` +
+      `&deploy=${encodeURIComponent(config.deployId)}`;
+    const res = https.post({
+      url,
+      headers: {
+        Authorization: `Bearer ${getAccessToken(config)}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+    if (res.code >= 300) {
+      throw new Error(`RESTlet call failed: ${res.code} ${res.body}`);
+    }
+    return JSON.parse(res.body);
+  };
+
+  const execute = () => {
+    const config = getConfig();
+    const result = postToRestlet(config, { externalId: "ORD-1001", lines: [{ sku: "ABC-1", qty: 2 }] });
+    log.audit("RESTlet response", JSON.stringify(result));
+  };
+
+  return { execute };
+});</script>
+
+<script type="text/plain" id="snip-suitescript-remote-install"># TARGET account (the one with the RESTlet):
+#   Do steps 1-3, 5 and 6 of this guide. In step 5, upload public-pss.pem
+#   from below and copy the Certificate ID.
+
+# SOURCE account (the one running this script):
+# 1. Generate an RSA-PSS key. SuiteScript signs PS256 only with an RSA-PSS key,
+#    so the plain RSA key from step 4 won't work here.
+openssl req -new -x509 -nodes -days 365 -newkey rsa-pss -pkeyopt rsa_keygen_bits:4096 \
+  -subj "/CN=ns-target-integration" -out public-pss.pem -keyout private-pss.pem
+cat public-pss.pem private-pss.pem > combined-pss.pem
+
+# 2. Setup > Company > Certificates: upload combined-pss.pem with the
+#    ID "_ns_target_pss" (NetSuite saves it as custcertificate_ns_target_pss).
+#
+# 3. Upload this script and create the script record. Add Free-Form Text parameters:
+#      custscript_target_account     target account ID, e.g. 7654321-sb1
+#      custscript_target_client_id   client ID of the integration in the target account
+#      custscript_target_cert_id     Certificate ID from the target account's M2M setup
+#      custscript_target_script_id   e.g. customscript_order_sync
+#      custscript_target_deploy_id   e.g. customdeploy_order_sync
+#
+# 4. Create a deployment, fill in the parameters, and run it.</script>
+
+<script type="text/plain" id="snip-curl"># 1. Exchange a signed JWT for an access token.
+#    $ASSERTION is a PS256 JWT signed with private.pem (build it with any of the other examples).
+curl -s -X POST "https://1234567-sb1.suitetalk.api.netsuite.com/services/rest/auth/oauth2/v1/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  --data-urlencode "grant_type=client_credentials" \
+  --data-urlencode "client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer" \
+  --data-urlencode "client_assertion=$ASSERTION"
+
+# Response: {"access_token":"eyJ...","expires_in":"3600","token_type":"Bearer"}
+
+# 2. Call the RESTlet with the token. Reuse $ACCESS_TOKEN for every call
+#    until shortly before expires_in runs out, then repeat step 1.
+curl -s -X POST "https://1234567-sb1.restlets.api.netsuite.com/app/site/hosting/restlet.nl?script=customscript_order_sync&deploy=customdeploy_order_sync" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"externalId":"ORD-1001","lines":[{"sku":"ABC-1","qty":2}]}'
+
+# JWT header:  {"alg":"PS256","typ":"JWT","kid":"<certificate id>"}
+# JWT payload: {"iss":"<client id>","scope":["restlets"],"aud":"<token url>","iat":<now>,"exp":<now+3600>}</script>
+
+<script type="text/plain" id="snip-java-install"><!-- pom.xml (Java 17+) -->
+<dependency>
+  <groupId>com.nimbusds</groupId>
+  <artifactId>nimbus-jose-jwt</artifactId>
+  <version>9.37.3</version>
+</dependency>
+
+# Java has no built-in .env loader. Export the variables first:
+#   set -a; source .env; set +a</script>
+
+<script type="text/plain" id="snip-csharp-install"># .NET 8 console app, no extra packages needed
+dotnet new console -n NetSuiteRestletClient
+# Replace Program.cs with the code below, then export the .env values and run:
+set -a; source .env; set +a
+dotnet run</script>
+
+<script>window.Prism = window.Prism || {}; window.Prism.manual = true;</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-clike.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup-templating.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-csharp.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-php.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-go.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-ruby.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-dart.min.js"></script><script>
+(function () {
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+  };
+  const snip = (id) => document.getElementById(id).textContent.replace(/^\n/, "");
+
+  // ---- Code blocks ----
+  function renderCode(el, text, lang, file) {
+    el.innerHTML = "";
+    const bar = document.createElement("div");
+    bar.className = "code-bar";
+    const name = document.createElement("span");
+    name.className = "fname";
+    name.textContent = file;
+    const btn = document.createElement("button");
+    btn.className = "copy";
+    btn.type = "button";
+    btn.textContent = "Copy";
+    bar.append(name, btn);
+
+    const pre = document.createElement("pre");
+    const code = document.createElement("code");
+    code.textContent = text;
+    pre.append(code);
+    el.append(bar, pre);
+
+    const grammar = window.Prism && Prism.languages && Prism.languages[lang];
+    if (grammar) {
+      try { code.innerHTML = Prism.highlight(text, grammar, lang); } catch (e) { code.textContent = text; }
+    }
+
+    btn.addEventListener("click", () => {
+      const done = () => {
+        btn.textContent = "Copied";
+        btn.classList.add("ok");
+        setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("ok"); }, 1600);
+      };
+      const fallback = () => {
+        const range = document.createRange();
+        range.selectNodeContents(code);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        btn.textContent = "Press Ctrl+C";
+      };
+      try {
+        navigator.clipboard.writeText(text).then(done, fallback);
+      } catch (e) { fallback(); }
+    });
+  }
+
+  document.querySelectorAll(".code[data-src]").forEach((el) => {
+    renderCode(el, snip(el.dataset.src), el.dataset.lang, el.dataset.file);
+  });
+
+  // ---- Markdown link for agents ----
+  const mdCopy = document.getElementById("md-copy");
+  mdCopy.addEventListener("click", () => {
+    const url = document.getElementById("md-link").href; // resolved to an absolute URL
+    const done = () => { mdCopy.textContent = "Copied"; setTimeout(() => { mdCopy.textContent = "Copy link"; }, 1600); };
+    try {
+      navigator.clipboard.writeText(url).then(done, () => { mdCopy.textContent = url; });
+    } catch (e) { mdCopy.textContent = url; }
+  });
+
+  // ---- Key pair generator ----
+  const kgRun = document.getElementById("kg-run");
+  const kgStatus = document.getElementById("kg-status");
+  const toHex = (bytes, sep) => Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join(sep);
+
+  // Libraries load on first use; each falls back to a second CDN if the first one fails
+  const X509_SOURCES = [
+    "https://cdn.jsdelivr.net/npm/@peculiar/x509@1.14.3/build/x509.js",
+    "https://unpkg.com/@peculiar/x509@1.14.3/build/x509.js",
+  ];
+  const JSZIP_SOURCES = [
+    "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js",
+    "https://unpkg.com/jszip@3.10.1/dist/jszip.min.js",
+  ];
+  function loadFirst(sources, globalName) {
+    if (window[globalName]) return Promise.resolve(window[globalName]);
+    return sources.reduce(
+      (prev, src) => prev.catch(() => new Promise((resolve, reject) => {
+        const el = document.createElement("script");
+        el.src = src;
+        el.onload = () => (window[globalName] ? resolve(window[globalName]) : reject(new Error("not loaded")));
+        el.onerror = () => { el.remove(); reject(new Error("not loaded")); };
+        document.head.append(el);
+      })),
+      Promise.reject(new Error("start"))
+    );
+  }
+  const loadX509 = () => loadFirst(X509_SOURCES, "x509");
+
+  // Inside Claude, files are saved through the downloads capability (the viewer confirms).
+  // Opened anywhere else, plain browser downloads are used.
+  const inClaude = typeof window.claude?.use === "function";
+  const downloadsReady = inClaude
+    ? window.claude.use("downloads").catch(() => null)
+    : Promise.resolve(null);
+  let lastKeys = null;
+
+  function browserDownload(filename, text) {
+    const url = URL.createObjectURL(new Blob([text], { type: "application/x-pem-file" }));
+    const link = Object.assign(document.createElement("a"), { href: url, download: filename });
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async function saveKeys() {
+    if (!lastKeys) return;
+    const { publicPem, privatePem } = lastKeys;
+
+    if (!inClaude) {
+      browserDownload("public.pem", publicPem);
+      setTimeout(() => browserDownload("private.pem", privatePem), 300);
+      kgStatus.textContent = "Downloaded public.pem and private.pem.";
+      return;
+    }
+
+    const downloads = await downloadsReady;
+    if (!downloads) {
+      kgStatus.textContent = "This view can't save files. Open the guide in claude.ai, or use OpenSSL below.";
+      return;
+    }
+    try {
+      // .pem isn't a type the page may save directly, so both keys go into one zip
+      const JSZip = await loadFirst(JSZIP_SOURCES, "JSZip");
+      const zip = new JSZip();
+      zip.file("public.pem", publicPem);
+      zip.file("private.pem", privatePem);
+      const blob = await zip.generateAsync({ type: "blob" });
+      kgStatus.textContent = "Confirm the download to save netsuite-keys.zip.";
+      await downloads.save({ filename: "netsuite-keys.zip", data: blob });
+      kgStatus.textContent = "Saved netsuite-keys.zip with public.pem and private.pem.";
+    } catch (e) {
+      const messages = {
+        declined: "Download cancelled. Use Download again to save the keys.",
+        rate_limited: "Another download prompt is open. Finish it, then use Download again.",
+      };
+      kgStatus.textContent = messages[e?.code] ||
+        (e?.code ? "This view can't save files. Open the guide in claude.ai, or use OpenSSL below."
+                 : "The zip library didn't load. Check your connection and use Download again.");
+    }
+  }
+
+  document.getElementById("kg-save").addEventListener("click", saveKeys);
+
+  kgRun.addEventListener("click", async () => {
+    if (!window.crypto || !crypto.subtle) {
+      kgStatus.textContent = "This browser doesn't support Web Crypto. Use OpenSSL below.";
+      return;
+    }
+    kgRun.disabled = true;
+    kgStatus.textContent = "Loading the certificate library…";
+    try {
+      await loadX509();
+    } catch (e) {
+      kgStatus.textContent = "The certificate library didn't load. Check your connection and try again, or use OpenSSL below.";
+      kgRun.disabled = false;
+      return;
+    }
+    // Strip characters that have special meaning in a certificate name
+    const cn = document.getElementById("kg-cn").value.trim().replace(/[,=+<>#;\\"]/g, "") || "restlet-integration";
+    const bits = Number(document.getElementById("kg-size").value);
+    const days = Number(document.getElementById("kg-days").value);
+
+    kgRun.disabled = true;
+    kgStatus.textContent = `Generating a ${bits}-bit key. This can take a few seconds.`;
+    try {
+      x509.cryptoProvider.set(crypto);
+      const alg = {
+        name: "RSA-PSS",
+        hash: "SHA-256",
+        publicExponent: new Uint8Array([1, 0, 1]),
+        modulusLength: bits,
+        saltLength: 32,
+      };
+      const keys = await crypto.subtle.generateKey(alg, true, ["sign", "verify"]);
+      const serial = crypto.getRandomValues(new Uint8Array(16));
+      serial[0] &= 0x7f;
+      const notBefore = new Date();
+      const notAfter = new Date(notBefore.getTime() + days * 24 * 60 * 60 * 1000);
+      const cert = await x509.X509CertificateGenerator.createSelfSigned({
+        serialNumber: toHex(serial, ""),
+        name: `CN=${cn}`,
+        notBefore,
+        notAfter,
+        signingAlgorithm: alg,
+        keys,
+      });
+
+      const publicPem = cert.toString("pem").trim() + "\n";
+      const privatePem = x509.PemConverter.encode(
+        await crypto.subtle.exportKey("pkcs8", keys.privateKey),
+        "PRIVATE KEY"
+      ).trim() + "\n";
+
+      let fingerprint = "";
+      try {
+        fingerprint = " · SHA-256 " + toHex(new Uint8Array(await cert.getThumbprint("SHA-256")), ":").toUpperCase();
+      } catch (e) {}
+
+      lastKeys = { publicPem, privatePem };
+      document.getElementById("kg-meta").textContent =
+        `CN=${cn} · ${bits}-bit RSA · expires ${notAfter.toISOString().slice(0, 10)}${fingerprint}`;
+      document.getElementById("kg-out").hidden = false;
+      await saveKeys();
+    } catch (e) {
+      kgStatus.textContent = `Couldn't generate the key pair: ${e.message}. Try again, or use OpenSSL below.`;
+    } finally {
+      kgRun.disabled = false;
+    }
+  });
+
+  // ---- Values helper and .env ----
+  const inAccount = document.getElementById("in-account");
+  const inScript = document.getElementById("in-script");
+  const inDeploy = document.getElementById("in-deploy");
+  const envBlock = document.getElementById("env-block");
+
+  function hostId(raw) {
+    return (raw || "").trim().toLowerCase().replace(/_/g, "-") || "1234567-sb1";
+  }
+  function updateValues() {
+    const acct = hostId(inAccount.value);
+    const script = inScript.value.trim() || "customscript_order_sync";
+    const deploy = inDeploy.value.trim() || "customdeploy_order_sync";
+    document.getElementById("out-token").textContent =
+      `https://${acct}.suitetalk.api.netsuite.com/services/rest/auth/oauth2/v1/token`;
+    document.getElementById("out-restlet").textContent =
+      `https://${acct}.restlets.api.netsuite.com/app/site/hosting/restlet.nl?script=${encodeURIComponent(script)}&deploy=${encodeURIComponent(deploy)}`;
+    const env = [
+      "# NetSuite account ID as used in URLs (lowercase, _ -> -)",
+      `NS_ACCOUNT_ID=${acct}`,
+      "",
+      "# Step 3: integration record",
+      "NS_CLIENT_ID=paste-your-client-id",
+      "",
+      "# Step 5: certificate mapping",
+      "NS_CERTIFICATE_ID=paste-your-certificate-id",
+      "NS_PRIVATE_KEY_PATH=./private.pem",
+      "",
+      "# Step 6: RESTlet deployment",
+      `NS_RESTLET_SCRIPT_ID=${script}`,
+      `NS_RESTLET_DEPLOY_ID=${deploy}`,
+    ].join("\n");
+    renderCode(envBlock, env, "bash", ".env");
+  }
+  [inAccount, inScript, inDeploy].forEach((i) => i.addEventListener("input", updateValues));
+  updateValues();
+
+  // ---- Language tabs ----
+  const LANGS = [
+    { id: "node", label: "Node.js", prism: "javascript", file: "restlet-client.js",
+      install: "npm install jsonwebtoken dotenv", installLang: "bash",
+      note: "Needs Node 18 or later for the built-in fetch. Reads settings from .env in the working directory." },
+    { id: "python", label: "Python", prism: "python", file: "restlet_client.py",
+      install: "pip install pyjwt cryptography requests python-dotenv", installLang: "bash",
+      note: "PyJWT signs PS256 through the cryptography package, so install both. Reads settings from .env." },
+    { id: "java", label: "Java", prism: "java", file: "NetSuiteRestletClient.java",
+      installSrc: "snip-java-install", installLang: "markup", installFile: "pom.xml",
+      note: "Java 17 or later. Uses Nimbus JOSE + JWT for PS256 signing and the built-in HttpClient for requests." },
+    { id: "csharp", label: "C#", prism: "csharp", file: "Program.cs",
+      installSrc: "snip-csharp-install", installLang: "bash",
+      note: ".NET 8 with no NuGet packages. The built-in RSA class signs with PSS padding, which is what PS256 needs." },
+    { id: "php", label: "PHP", prism: "php", file: "restlet_client.php",
+      install: "composer require phpseclib/phpseclib:~3.0 vlucas/phpdotenv", installLang: "bash",
+      note: "PHP's OpenSSL extension can't do PSS signatures, so this uses phpseclib to sign. Requests use the curl extension." },
+    { id: "go", label: "Go", prism: "go", file: "main.go",
+      install: "go get github.com/golang-jwt/jwt/v5 github.com/joho/godotenv", installLang: "bash",
+      note: "golang-jwt's PS256 method uses a 32-byte salt, which NetSuite expects." },
+    { id: "ruby", label: "Ruby", prism: "ruby", file: "restlet_client.rb",
+      install: "gem install jwt dotenv", installLang: "bash",
+      note: "ruby-jwt supports PS256 with the openssl gem 2.1 or later, which ships with current Ruby." },
+    { id: "dart", label: "Dart", prism: "dart", file: "bin/restlet_client.dart",
+      install: "dart pub add dart_jsonwebtoken http dotenv", installLang: "bash",
+      note: "Dart 3 on a server or CLI. Don't ship this in a Flutter app: anyone with the app could extract the private key. Have the app call your own backend instead." },
+    { id: "suitescript", label: "SuiteScript (same account)", prism: "javascript", file: "SuiteScripts/call_order_sync.js",
+      installSrc: "snip-suitescript-install", installLang: "bash", installFile: "Setup",
+      note: "For calling a RESTlet from another script in the same NetSuite account. N/https.requestRestlet authenticates as the script's own user and role, so steps 3 to 5 and the token cache aren't needed. For a RESTlet in a different account, use the other SuiteScript tab." },
+    { id: "suitescript-remote", label: "SuiteScript (other account)", prism: "javascript", file: "SuiteScripts/call_remote_restlet.js",
+      installSrc: "snip-suitescript-remote-install", installLang: "bash", installFile: "Setup",
+      note: "For calling a RESTlet in a different NetSuite account, such as production calling a partner's account. The private key lives in this account's certificate store and N/crypto/certificate signs the JWT. Script runs don't share memory, so the token is cached in N/cache." },
+    { id: "curl", label: "cURL", prism: "bash", file: "Terminal",
+      install: "# Nothing to install. Use this to see the raw HTTP requests.", installLang: "bash",
+      note: "Raw requests for debugging. cURL can't sign the JWT, so build the assertion with one of the other languages first." },
+  ];
+
+  const tabs = document.getElementById("lang-tabs");
+  const note = document.getElementById("lang-note");
+  const installEl = document.getElementById("lang-install");
+  const codeEl = document.getElementById("lang-code");
+
+  LANGS.forEach((l, i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.setAttribute("role", "tab");
+    b.id = "tab-" + l.id;
+    b.textContent = l.label;
+    b.setAttribute("aria-controls", "lang-panel");
+    b.addEventListener("click", () => selectLang(l.id, true));
+    b.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+      e.preventDefault();
+      const next = LANGS[(i + (e.key === "ArrowRight" ? 1 : LANGS.length - 1)) % LANGS.length];
+      selectLang(next.id, true);
+      document.getElementById("tab-" + next.id).focus();
+    });
+    tabs.append(b);
+  });
+
+  function selectLang(id, remember) {
+    const l = LANGS.find((x) => x.id === id) || LANGS[0];
+    tabs.querySelectorAll("button").forEach((b) => {
+      const on = b.id === "tab-" + l.id;
+      b.setAttribute("aria-selected", on ? "true" : "false");
+      b.tabIndex = on ? 0 : -1;
+    });
+    note.textContent = l.note;
+    const installText = l.installSrc ? snip(l.installSrc) : l.install;
+    renderCode(installEl, installText, l.installLang, l.installFile || "Terminal");
+    renderCode(codeEl, snip("snip-" + l.id), l.prism, l.file);
+    if (remember) store.set("ns-guide-lang", l.id);
+  }
+  selectLang(store.get("ns-guide-lang") || "node", false);
+
+  // ---- Step progress ----
+  const steps = Array.from(document.querySelectorAll("section.step[data-step]"));
+  const railLinks = new Map(
+    Array.from(document.querySelectorAll("#rail-list a")).map((a) => [a.getAttribute("href").slice(1), a])
+  );
+  function updateProgress() {
+    let n = 0;
+    steps.forEach((s) => {
+      const on = document.getElementById("done-" + s.dataset.step).checked;
+      s.classList.toggle("is-done", on);
+      const link = railLinks.get(s.id);
+      if (link) link.classList.toggle("done", on);
+      if (on) n++;
+    });
+    document.getElementById("progress-label").textContent = `${n} of ${steps.length} steps done`;
+    document.getElementById("progress-bar").style.width = (n / steps.length) * 100 + "%";
+  }
+  steps.forEach((s) => {
+    const box = document.getElementById("done-" + s.dataset.step);
+    box.checked = store.get("ns-guide-done-" + s.dataset.step) === "1";
+    box.addEventListener("change", () => {
+      store.set("ns-guide-done-" + s.dataset.step, box.checked ? "1" : "0");
+      updateProgress();
+    });
+  });
+  updateProgress();
+})();
+</script>
